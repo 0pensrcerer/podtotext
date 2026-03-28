@@ -9,6 +9,8 @@ from pathlib import Path
 from podtotext.ingest import (
     detect_source_type,
     download_episode,
+    is_processed,
+    mark_processed,
     parse_rss,
     parse_youtube,
 )
@@ -77,12 +79,13 @@ def main(argv: list[str] | None = None) -> None:
         title = episode.get("title", "Untitled")
         print(f"\n[{i}/{len(episodes)}] {title}")
 
-        # Download
-        audio_path = download_episode(episode, staging_dir, state_file)
-        if audio_path is None:
+        # Skip if already fully processed
+        if is_processed(episode, state_file):
             print("  Skipped (already processed).")
             continue
 
+        # Download
+        audio_path = download_episode(episode, staging_dir)
         print(f"  Downloaded: {audio_path}")
 
         # Transcribe
@@ -94,5 +97,8 @@ def main(argv: list[str] | None = None) -> None:
         data = build_episode_json(episode, audio_path, transcription)
         json_path = save_episode_json(data, output_dir)
         print(f"  Saved: {json_path}")
+
+        # Mark as fully processed only after the entire pipeline succeeds
+        mark_processed(episode, state_file)
 
     print("\nDone.")

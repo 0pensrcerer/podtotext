@@ -79,11 +79,12 @@ def parse_youtube(url: str) -> list[dict[str, Any]]:
     ydl_opts: dict[str, Any] = {
         "quiet": True,
         "extract_flat": True,
-        "force_generic_extractor": False,
     }
     episodes: list[dict[str, Any]] = []
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
+        if not info:
+            return episodes
         entries = info.get("entries") or [info]
         for entry in entries:
             video_url = entry.get("url") or entry.get("webpage_url", url)
@@ -102,22 +103,30 @@ def parse_youtube(url: str) -> list[dict[str, Any]]:
 # Shared download
 # ---------------------------------------------------------------------------
 
+def is_processed(episode: dict[str, Any], state_file: Path) -> bool:
+    """Return True if *episode* has already been fully processed."""
+    return episode["guid"] in _load_processed(state_file)
+
+
+def mark_processed(episode: dict[str, Any], state_file: Path) -> None:
+    """Record *episode* as fully processed in *state_file*."""
+    processed = _load_processed(state_file)
+    processed.add(episode["guid"])
+    _save_processed(state_file, processed)
+
+
 def download_episode(
     episode: dict[str, Any],
     staging_dir: Path,
-    state_file: Path,
-) -> Path | None:
+) -> Path:
     """Download a single episode's audio as WAV to *staging_dir*.
 
-    Returns the path to the downloaded WAV file, or ``None`` if the episode
-    was already processed.
+    Returns the path to the downloaded WAV file.
     """
-    processed = _load_processed(state_file)
-    guid = episode["guid"]
-    if guid in processed:
-        return None
-
     slug = slugify(episode["title"]) or "episode"
+
+    os.makedirs(staging_dir, exist_ok=True)
+
     out_path = staging_dir / f"{slug}.wav"
 
     # Avoid filename collisions by appending a counter.
@@ -125,8 +134,6 @@ def download_episode(
     while out_path.exists():
         out_path = staging_dir / f"{slug}-{counter}.wav"
         counter += 1
-
-    os.makedirs(staging_dir, exist_ok=True)
 
     ydl_opts: dict[str, Any] = {
         "quiet": True,
@@ -142,10 +149,6 @@ def download_episode(
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([episode["audio_url"]])
-
-    # Mark as processed
-    processed.add(guid)
-    _save_processed(state_file, processed)
 
     return out_path
 
