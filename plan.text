@@ -1,0 +1,40 @@
+this file is the instructions to build the project.
+
+Plan: podtotext Pipeline (Download → Transcribe → JSON)
+TL;DR: A Python CLI tool that ingests podcasts from RSS feeds or YouTube, downloads audio with yt-dlp, transcribes locally with Whisper, and outputs per-episode JSON with metadata + transcript segments.
+
+Phase 1: Project Setup
+
+Create requirements.txt with: yt-dlp, openai-whisper, feedparser, torch
+Scaffold package: podtotext/ with cli.py, ingest.py, transcribe.py, output.py
+Phase 2: Ingestion (ingest.py) — parallel paths
+3. RSS path: use feedparser to parse the feed URL → extract episode audio URLs + metadata (title, published date, guid)
+4. YouTube path: pass channel/playlist URL directly to yt-dlp's Python API
+5. Shared download function: yt-dlp downloads each episode as WAV to a staging dir; skips already-processed episodes via a processed.json state file
+
+Phase 3: Transcription (transcribe.py) — depends on Phase 2
+6. Load Whisper model once at startup (configurable size: tiny / base / medium)
+7. For each audio file: call whisper.transcribe(path) → returns full text + timestamped segments
+
+Phase 4: Output (output.py) — depends on Phase 3
+8. Build per-episode JSON: { title, date, source_url, audio_file, transcript, segments: [{start, end, text}] }
+9. Save to output/ dir as {episode-slug}.json
+
+Phase 5: CLI Orchestration (cli.py) — wires all phases together
+10. Entry point: python -m podtotext <url> [--model base] [--output-dir ./output]
+11. Auto-detects source type (RSS vs YouTube) and routes accordingly
+12. Runs ingestion → transcription → output per episode sequentially
+
+Project structure:
+
+
+podtotext/├── podtotext/│   ├── __init__.py│   ├── cli.py│   ├── ingest.py│   ├── transcribe.py│   └── output.py├── requirements.txt└── research.txt
+Verification
+
+Run python -m podtotext <rss_url> --model tiny on a small test feed (2–3 episodes) — confirm JSON output in output/
+Run against a YouTube playlist URL — confirm same JSON structure
+Re-run the same command — confirm already-processed episodes are skipped (idempotency via processed.json)
+Decisions
+
+Audio files are kept on disk (not deleted) so you can re-transcribe with a better model later
+processed.json tracks GUIDs/URLs to make re-runs safe
