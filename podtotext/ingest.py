@@ -4,23 +4,13 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from pathlib import Path
 from typing import Any
 
 import feedparser
 import yt_dlp
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _slugify(text: str) -> str:
-    """Return a filesystem-safe slug for *text*."""
-    text = text.lower().strip()
-    text = re.sub(r"[^\w\s-]", "", text)
-    return re.sub(r"[\s_-]+", "-", text).strip("-")
+from podtotext.utils import slugify
 
 
 def _load_processed(state_file: Path) -> set[str]:
@@ -127,7 +117,7 @@ def download_episode(
     if guid in processed:
         return None
 
-    slug = _slugify(episode["title"]) or "episode"
+    slug = slugify(episode["title"]) or "episode"
     out_path = staging_dir / f"{slug}.wav"
 
     # Avoid filename collisions by appending a counter.

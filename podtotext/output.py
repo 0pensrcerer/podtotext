@@ -3,16 +3,10 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
-
-def _slugify(text: str) -> str:
-    """Return a filesystem-safe slug for *text*."""
-    text = text.lower().strip()
-    text = re.sub(r"[^\w\s-]", "", text)
-    return re.sub(r"[\s_-]+", "-", text).strip("-")
+from podtotext.utils import slugify
 
 
 def build_episode_json(
@@ -37,7 +31,7 @@ def save_episode_json(
 ) -> Path:
     """Save *data* as a JSON file in *output_dir* and return the file path."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    slug = _slugify(data.get("title", "episode")) or "episode"
+    slug = slugify(data.get("title", "episode")) or "episode"
     out_path = output_dir / f"{slug}.json"
 
     # Avoid overwriting existing files.
